@@ -69,8 +69,9 @@ binary install prefix (in `sudo` mode this is `$SUDO_USER`'s home, since
 `init-hsm` runs as that user — never root):
 
 - `~/.tmh/hsm.env` — exports `SOFTHSM2_CONF`, `PKCS11_MODULE`, `TMH_HSM_PIN_FILE`,
-  `TMH_HSM_TOKEN_LABEL`. Source it (or have your shell profile source it) before
-  running `tmh`.
+  `TMH_HSM_TOKEN_LABEL`. `tmh enroll` and `tmh renew` read this file
+  automatically (`--hsm-env-file` points elsewhere, `--no-hsm-env` skips it);
+  source it only for other tools that use the same token.
 - `~/.tmh/hsm.pin` — the token PIN file referenced by `TMH_HSM_PIN_FILE`.
 
 On success the installer prints `env_file=~/.tmh/hsm.env` in its machine-readable
