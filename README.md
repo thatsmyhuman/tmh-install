@@ -26,7 +26,24 @@ curl -fsSL \
 The environment assignment must bind to `sh` (not `curl`), so it goes on the
 `sh` side of the pipe.
 
-Add `$HOME/.tmh/current/bin` to your `PATH`.
+**PATH.** A user-mode install prepends a marked block to `~/.bashrc` (and
+`~/.zshenv` when you use zsh) so new **bash and zsh** shells — and
+`ssh <host> 'tmh ...'` — find the binaries. The previous contents are copied to
+`<rc>.tmh-bak` first, a symlinked rc is never rewritten, and `--uninstall`
+removes the block again. Set `TMH_INSTALL_NO_SHELL_PATH=1` to skip it entirely.
+
+fish, systemd units, cron, containers and `sudo`'s `secure_path` are deliberately
+**not** covered — for those use the absolute path
+`$HOME/.tmh/current/bin/<binary>`, which is what the installer prints.
+
+For the shell you are in *right now*:
+
+```sh
+export PATH="$HOME/.tmh/current/bin:$PATH"
+```
+
+Everything works without that too — the installer prints an absolute-path
+command you can run as-is.
 
 ### System-wide (secondary — requires root)
 
@@ -75,7 +92,18 @@ binary install prefix (in `sudo` mode this is `$SUDO_USER`'s home, since
 - `~/.tmh/hsm.pin` — the token PIN file referenced by `TMH_HSM_PIN_FILE`.
 
 On success the installer prints `env_file=~/.tmh/hsm.env` in its machine-readable
-`tmh-install: OK ...` line.
+`tmh-install: OK ...` line:
+
+```
+tmh-install: OK version=<label> prefix=<prefix> env_file=<path> binary_version=<x.y.z> release_digest=<hex12> path_persisted=<0|1>
+```
+
+`version=` is the **release directory label**, not a version — do not compare it
+as a semver and do not feed it back as `TMH_INSTALL_VERSION`. Use
+`binary_version=` for both (re-pin as `v<binary_version>`); it is empty when the
+version could not be trusted (no verified signature) or read. `path_persisted=1`
+means a shell rc was updated. All warnings go to stderr, so that field is the
+only way a stdout-only parser can tell whether PATH wiring succeeded.
 
 ## Verifying releases
 
@@ -149,9 +177,10 @@ curl -fsSL \
 | Variable | Purpose |
 |----------|---------|
 | `TMH_INSTALL_VERSION` | Pin a release (e.g. `v0.1.0`); default is the `latest` redirect. Also the rate-limit workaround. |
-| `TMH_INSTALL_PREFIX` | Install prefix. Default `/opt/tmh` (system); set to `$HOME/.tmh` for user-mode. |
+| `TMH_INSTALL_PREFIX` | Install prefix. Default: `/opt/tmh` as root, `$HOME/.tmh` otherwise. |
 | `TMH_INSTALL_BASE_URL` | Override the download origin (mirror / air-gap). |
-| `TMH_INSTALL_NO_LINK=1` | Skip `/usr/local/bin` symlinks (sudo mode). |
+| `TMH_INSTALL_NO_LINK=1` | Skip `/usr/local/bin` symlinks (sudo mode) **and** the managed PATH block (user mode). |
+| `TMH_INSTALL_NO_SHELL_PATH=1` | Skip the managed PATH block in your shell rc files (user mode). |
 | `TMH_INSTALL_NO_HSM=1` | Skip SoftHSM package install + token init. |
 | `TMH_INSTALL_REQUIRE_SIGNATURE=1` | Fail if `minisign` is unavailable (no checksum-only fallback). |
 | `TMH_INSTALL_DRYRUN=1` | Do everything except mutating system dirs / package managers (CI). |
@@ -164,8 +193,22 @@ curl -fsSL \
   https://github.com/thatsmyhuman/tmh-install/releases/latest/download/install.sh | sh -s -- --uninstall
 ```
 
-Uninstall removes the installed binaries and symlinks but **preserves** your
-SoftHSM tokens and configuration.
+Uninstall removes the installed binaries and symlinks, and strips the managed
+PATH block from your shell rc files (leaving the rest of the file byte-identical
+and keeping the `<rc>.tmh-bak` backup). It **preserves** your SoftHSM tokens and
+configuration.
+
+## Upgrading
+
+Re-run the same one-liner. An **unpinned** install converges to whatever the
+channel currently serves, in either direction — that is deliberate: yanking a
+bad release makes `releases/latest/download/...` self-heal to the previous good
+one, and a "never downgrade" rule would break that recovery. A **pin** is
+honoured verbatim and is the rollback lever.
+
+Releases are kept side by side under `<prefix>/releases/<label>/`, with
+`<prefix>/current` a symlink to the active one, so a re-point is a rollback that
+needs no download.
 
 ## Troubleshooting
 
